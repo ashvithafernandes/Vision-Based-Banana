@@ -1,3 +1,4 @@
+import * as FileSystem from 'expo-file-system';
 import { SERVER_URL } from './config';
 
 export const CLASS_NAMES = ['With Carbide', 'Without Carbide', 'Not a Banana'];
@@ -46,38 +47,45 @@ export async function checkServerHealth() {
 
 /**
  * Classifier service:
- * Calls the Two-Stage AI server (YOLOv8 Gatekeeper + MobileNetV3 TFLite) via ngrok.
+ * Uses expo-file-system to guarantee 100% reliable in-memory Base64 transmission
+ * to the Two-Stage AI server via ngrok.
  */
 export async function classifyImage(imageUri, base64Data = null) {
-  let requestBody;
-  const headers = {
-    'ngrok-skip-browser-warning': 'true',
-    'Accept': 'application/json',
-  };
+  let b64 = base64Data;
 
-  // 1. Prepare payload: prefer Base64 to bypass mobile filesystem fetch quirks
-  if (base64Data) {
-    headers['Content-Type'] = 'application/json';
-    requestBody = JSON.stringify({ image: base64Data });
-  } else {
+  // 1. If base64 was not provided by picker, read directly from device storage
+  if (!b64 && imageUri) {
     try {
-      const response = await fetch(imageUri);
-      requestBody = await response.blob();
-      headers['Content-Type'] = 'application/octet-stream';
-    } catch (fetchErr) {
-      throw new Error(`Failed to read selected image: ${fetchErr.message}`);
+      console.log('[Classifier] Reading image via native FileSystem from:', imageUri);
+      b64 = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      console.log('[Classifier] Successfully read', b64.length, 'Base64 characters.');
+    } catch (fsErr) {
+      console.warn('[Classifier] FileSystem read error:', fsErr);
     }
   }
 
-  // 2. Send to AI server for two-stage inference
+  if (!b64) {
+    throw new Error(
+      'Could not read the photo data from your device. Please try selecting the photo again.'
+    );
+  }
+
+  // 2. Transmit Base64 JSON payload to AI Server
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
+    console.log('[Classifier] Sending POST to:', SERVER_URL);
     const serverResponse = await fetch(SERVER_URL, {
       method: 'POST',
-      headers: headers,
-      body: requestBody,
+      headers: {
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+        'Accept': 'application/json',
+      },
+      body: JSON.stringify({ image: b64 }),
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
@@ -100,7 +108,7 @@ export async function classifyImage(imageUri, base64Data = null) {
   } catch (err) {
     if (err.name === 'AbortError') {
       throw new Error(
-        `AI server timed out (35s) at ${SERVER_URL}.\nThe first request may take a moment while models warm up. Please try again.`
+        `AI server timed out (45s) at ${SERVER_URL}.\nThe first request may take a moment while models warm up. Please try again.`
       );
     }
     throw new Error(

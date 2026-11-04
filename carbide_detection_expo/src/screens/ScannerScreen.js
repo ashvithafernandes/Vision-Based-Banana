@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
 import { classifyImage, checkServerHealth } from '../services/classifier';
@@ -101,8 +102,19 @@ export default function ScannerScreen({ initialAction, onBack }) {
           setLoadingStep('Stage 2: Analyzing ripening & carbide markers...');
         }, 500);
 
-        // Pass Base64 directly to bypass mobile file URI issues
-        const res = await classifyImage(asset.uri, asset.base64);
+        // Resolve Base64 either from asset or through native FileSystem
+        let base64Data = asset.base64;
+        if (!base64Data && asset.uri) {
+          try {
+            base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+              encoding: FileSystem.EncodingType.Base64,
+            });
+          } catch (fsErr) {
+            console.warn('[Scanner] FileSystem read error:', fsErr);
+          }
+        }
+
+        const res = await classifyImage(asset.uri, base64Data);
         setResult(res);
         setLoading(false);
       }
