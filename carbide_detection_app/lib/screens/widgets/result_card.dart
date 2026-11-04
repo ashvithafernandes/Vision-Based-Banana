@@ -41,7 +41,9 @@ class ResultCard extends StatelessWidget {
     } else {
       badgeColor = AppTheme.softGlacierBlue.withOpacity(0.4);
       badgeTextColor = AppTheme.glacierBlueText;
-      badgeTitle = 'Non-Banana Object';
+      badgeTitle = result.detectedObject != 'Banana' 
+          ? 'Non-Banana (${result.detectedObject})' 
+          : 'Non-Banana Subject';
       badgeIcon = Icons.info_outline_rounded;
     }
 
@@ -111,7 +113,79 @@ class ResultCard extends StatelessWidget {
             ],
           ),
 
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+
+          // Two-Stage Pipeline Telemetry Strip
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.background.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppTheme.borderLight),
+            ),
+            child: Row(
+              children: [
+                // Stage 1 Status
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        result.isBanana ? Icons.check_circle_rounded : Icons.cancel_rounded,
+                        size: 15,
+                        color: result.isBanana ? AppTheme.mintGreen : AppTheme.coralAccent,
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          result.isBanana
+                              ? 'Stage 1: Banana Confirmed'
+                              : 'Stage 1: Rejected (${result.detectedObject})',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: result.isBanana ? AppTheme.textPrimary : AppTheme.coralAccent,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Container(
+                  height: 16,
+                  width: 1,
+                  color: AppTheme.borderLight,
+                  margin: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                // Stage 2 Status
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        result.isBanana ? Icons.verified_rounded : Icons.fast_forward_rounded,
+                        size: 15,
+                        color: result.isBanana ? AppTheme.mintGreen : AppTheme.textMuted,
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          result.isBanana ? 'Stage 2: Carbide Analyzed' : 'Stage 2: Skipped',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: result.isBanana ? AppTheme.textPrimary : AppTheme.textMuted,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
 
           // Analyzed Image Thumbnail & Class Name
           Row(
@@ -153,9 +227,11 @@ class ResultCard extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      '100% Offline MobileNetV3',
+                      result.isBanana
+                          ? 'YOLO11n (${result.stage1LatencyMs.toStringAsFixed(0)}ms) + MobileNetV3 (${result.stage2LatencyMs?.toStringAsFixed(0) ?? 0}ms)'
+                          : 'YOLO11n Gatekeeper (${result.stage1LatencyMs.toStringAsFixed(0)}ms)',
                       style: GoogleFonts.plusJakartaSans(
-                        fontSize: 11,
+                        fontSize: 10.5,
                         color: AppTheme.textMuted,
                       ),
                     ),
@@ -198,63 +274,65 @@ class ResultCard extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          // Probability Breakdown Bars
-          Text(
-            'Class Probability Distribution',
-            style: GoogleFonts.plusJakartaSans(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textSecondary,
+          // Probability Breakdown Bars (Only relevant if Stage 2 ran or non-banana probabilities)
+          if (result.isBanana) ...[
+            Text(
+              'Class Probability Distribution',
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: AppTheme.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          ...result.classProbabilities.entries.map((entry) {
-            final pct = entry.value;
-            final isWinner = entry.key == result.predictedClass;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 8.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        entry.key,
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.5,
-                          fontWeight: isWinner ? FontWeight.w700 : FontWeight.w500,
-                          color: isWinner ? AppTheme.textPrimary : AppTheme.textSecondary,
+            const SizedBox(height: 10),
+            ...result.classProbabilities.entries.map((entry) {
+              final pct = entry.value;
+              final isWinner = entry.key == result.predictedClass;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          entry.key,
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: isWinner ? FontWeight.w700 : FontWeight.w500,
+                            color: isWinner ? AppTheme.textPrimary : AppTheme.textSecondary,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${(pct * 100).toStringAsFixed(1)}%',
-                        style: GoogleFonts.plusJakartaSans(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
-                          color: isWinner ? AppTheme.coralAccent : AppTheme.textSecondary,
+                        Text(
+                          '${(pct * 100).toStringAsFixed(1)}%',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w700,
+                            color: isWinner ? AppTheme.coralAccent : AppTheme.textSecondary,
+                          ),
                         ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: pct.clamp(0.0, 1.0),
-                      minHeight: 6,
-                      backgroundColor: AppTheme.borderLight,
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        isWinner ? AppTheme.coralAccent : AppTheme.textMuted,
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: pct.clamp(0.0, 1.0),
+                        minHeight: 6,
+                        backgroundColor: AppTheme.borderLight,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          isWinner ? AppTheme.coralAccent : AppTheme.textMuted,
+                        ),
                       ),
                     ),
-                  ),
-                ],
-              ),
-            );
-          }),
+                  ],
+                ),
+              );
+            }),
+          ],
 
-          // Collapsible JSON Telemetry (Specifically requested by user!)
+          // Collapsible JSON Telemetry
           JsonInspectorWidget(result: result),
 
           const SizedBox(height: 10),

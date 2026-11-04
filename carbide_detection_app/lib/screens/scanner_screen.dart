@@ -60,13 +60,13 @@ class _ScannerScreenState extends State<ScannerScreen> with SingleTickerProvider
       setState(() {
         _selectedImage = File(file.path);
         _isLoading = true;
-        _loadingMessage = 'Preprocessing image (224x224)...';
+        _loadingMessage = 'Stage 1: YOLO11n verifying banana...';
       });
 
       // Update loading message after short delay to show progression
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
-      setState(() => _loadingMessage = 'Running offline MobileNetV3 inference...');
+      setState(() => _loadingMessage = 'Stage 2: Analyzing ripening & carbide markers...');
 
       final result = await _classifier.classifyImage(_selectedImage!);
 
