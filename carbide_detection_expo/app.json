@@ -21,7 +21,8 @@
         {
           "photosPermission": "Allow RipeScan to access your photos to analyze fruit images."
         }
-      ]
+      ],
+      "expo-status-bar"
     ],
     "ios": {
       "supportsTablet": true

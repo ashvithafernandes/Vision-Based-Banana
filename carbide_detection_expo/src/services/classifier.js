@@ -1,7 +1,7 @@
 export const CLASS_NAMES = ['With Carbide', 'Without Carbide', 'Not a Banana'];
 
 // Current PC Wi-Fi IP running model_server.py
-const SERVER_URL = 'http://10.249.48.123:5000/predict';
+const SERVER_URL = 'http://192.168.1.5:5000/predict';
 
 /**
  * Classifier service:
