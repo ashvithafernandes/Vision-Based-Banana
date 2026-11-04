@@ -48,16 +48,16 @@ def main():
     ngrok_proc = None
 
     try:
-        # 1. Start Two-Stage AI Server
-        print("[1/3] Starting Two-Stage AI Server (model_server.py)...")
+        # 1. Start Two-Stage AI Server (in dedicated console for live logs)
+        print("[1/3] Starting Two-Stage AI Server (Live Logs Console)...")
         server_py = os.path.join(BASE_DIR, "model_server.py")
+        creationflags = subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
         server_proc = subprocess.Popen(
             [PYTHON_EXE, server_py],
             cwd=BASE_DIR,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            creationflags=creationflags,
         )
-        time.sleep(1)
+        time.sleep(1.5)
 
         # 2. Start Ngrok Tunnel on Port 5000
         print("[2/3] Initializing Ngrok Tunnel on port 5000...")
@@ -107,3 +107,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

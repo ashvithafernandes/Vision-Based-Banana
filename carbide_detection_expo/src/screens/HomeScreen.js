@@ -1,16 +1,33 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
+import { checkServerHealth } from '../services/classifier';
+import { SERVER_URL } from '../services/config';
 
 export default function HomeScreen({ onOpenScanner, onOpenGallery }) {
+  const [serverOnline, setServerOnline] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  const checkConn = async () => {
+    setChecking(true);
+    const res = await checkServerHealth();
+    setServerOnline(res.connected);
+    setChecking(false);
+  };
+
+  useEffect(() => {
+    checkConn();
+  }, []);
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       <ScrollView
@@ -37,10 +54,45 @@ export default function HomeScreen({ onOpenScanner, onOpenGallery }) {
         {/* 2. Dashboard Title with Action Icon */}
         <View style={styles.titleRow}>
           <Text style={styles.pageTitle}>Dashboard</Text>
-          <TouchableOpacity style={styles.calendarBtn}>
-            <Ionicons name="calendar-outline" size={17} color="#FFFFFF" />
+          <TouchableOpacity style={styles.calendarBtn} onPress={checkConn}>
+            <Ionicons name="refresh-outline" size={17} color="#FFFFFF" />
           </TouchableOpacity>
         </View>
+
+        {/* Backend Ngrok Status Banner */}
+        <TouchableOpacity
+          style={[styles.connBanner, serverOnline ? styles.connOnline : styles.connOffline]}
+          activeOpacity={0.7}
+          onPress={() => {
+            Alert.alert(
+              serverOnline ? '✅ AI Backend Connected' : '❌ AI Backend Offline',
+              `Target Endpoint:\n${SERVER_URL}\n\nStatus: ${
+                serverOnline
+                  ? 'ngrok tunnel connected to local model_server.py.'
+                  : 'Cannot reach server. Ensure run_app.bat is running on your PC.'
+              }`,
+              [{ text: 'Retest', onPress: checkConn }, { text: 'OK' }]
+            );
+          }}
+        >
+          {checking ? (
+            <ActivityIndicator size="small" color={COLORS.coral} style={{ marginRight: 6 }} />
+          ) : (
+            <Ionicons
+              name={serverOnline ? 'radio-outline' : 'alert-circle-outline'}
+              size={15}
+              color={serverOnline ? '#10B981' : '#EF4444'}
+              style={{ marginRight: 6 }}
+            />
+          )}
+          <Text style={[styles.connText, { color: serverOnline ? '#065F46' : '#991B1B' }]} numberOfLines={1}>
+            {checking
+              ? 'Verifying AI backend...'
+              : serverOnline
+              ? `AI Backend Online • ${SERVER_URL.replace('https://', '').replace('/predict', '')}`
+              : 'AI Backend Offline • Tap to retest'}
+          </Text>
+        </TouchableOpacity>
 
         {/* 3. Two Pill Stat Cards (Screen 1 Reference) */}
         <View style={styles.statsRow}>
@@ -524,5 +576,33 @@ const styles = StyleSheet.create({
   clueBold: {
     color: COLORS.textPrimary,
     ...FONTS.bold,
+  },
+  connBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginBottom: 16,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  connOnline: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  connOffline: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  connText: {
+    fontSize: 12,
+    ...FONTS.semiBold,
+    flex: 1,
   },
 });

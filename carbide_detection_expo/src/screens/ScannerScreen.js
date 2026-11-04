@@ -13,7 +13,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, FONTS } from '../theme';
-import { classifyImage } from '../services/classifier';
+import { classifyImage, checkServerHealth } from '../services/classifier';
+import { SERVER_URL } from '../services/config';
 import ResultCard from '../components/ResultCard';
 
 export default function ScannerScreen({ initialAction, onBack }) {
@@ -21,6 +22,29 @@ export default function ScannerScreen({ initialAction, onBack }) {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [loadingStep, setLoadingStep] = useState('Loading...');
+
+  // Backend live health state
+  const [serverStatus, setServerStatus] = useState({
+    checking: true,
+    connected: false,
+    url: SERVER_URL,
+    message: '',
+  });
+
+  const verifyConnection = async () => {
+    setServerStatus((prev) => ({ ...prev, checking: true }));
+    const status = await checkServerHealth();
+    setServerStatus({
+      checking: false,
+      connected: status.connected,
+      url: status.url,
+      message: status.connected ? 'Connected' : (status.error || 'Offline'),
+    });
+  };
+
+  useEffect(() => {
+    verifyConnection();
+  }, []);
 
   // Auto-launch gallery if user selected "Upload Photo" from Dashboard
   useEffect(() => {
@@ -44,9 +68,10 @@ export default function ScannerScreen({ initialAction, onBack }) {
         }
         pickerResult = await ImagePicker.launchCameraAsync({
           mediaTypes: ['images'],
-          quality: 0.9,
+          quality: 0.85,
           allowsEditing: true,
           aspect: [1, 1],
+          base64: true, // Enables direct in-memory binary transmission
         });
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -59,29 +84,34 @@ export default function ScannerScreen({ initialAction, onBack }) {
         }
         pickerResult = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ['images'],
-          quality: 0.9,
+          quality: 0.85,
           allowsEditing: true,
           aspect: [1, 1],
+          base64: true, // Enables direct in-memory binary transmission
         });
       }
 
       if (!pickerResult.canceled && pickerResult.assets && pickerResult.assets.length > 0) {
-        const uri = pickerResult.assets[0].uri;
-        setSelectedImage(uri);
+        const asset = pickerResult.assets[0];
+        setSelectedImage(asset.uri);
         setLoading(true);
-        setLoadingStep('Preprocessing image (224x224)...');
+        setLoadingStep('Stage 1: YOLO Gatekeeper verifying banana...');
 
         setTimeout(() => {
-          setLoadingStep('Running offline MobileNetV3 inference...');
-        }, 350);
+          setLoadingStep('Stage 2: Analyzing ripening & carbide markers...');
+        }, 500);
 
-        const res = await classifyImage(uri);
+        // Pass Base64 directly to bypass mobile file URI issues
+        const res = await classifyImage(asset.uri, asset.base64);
         setResult(res);
         setLoading(false);
       }
     } catch (err) {
       setLoading(false);
-      Alert.alert('Analysis Error', err.message || 'Failed to process image');
+      Alert.alert(
+        'Analysis Error',
+        err.message || 'Failed to process image. Please check the backend connection.'
+      );
     }
   };
 
@@ -101,10 +131,7 @@ export default function ScannerScreen({ initialAction, onBack }) {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
       {result ? (
-        <ScrollView
-          contentContainerStyle={styles.resultScroll}
-          showsVerticalScrollIndicator={false}
-        >
+        <ScrollView contentContainerStyle={styles.resultScroll} showsVerticalScrollIndicator={false}>
           {/* Header */}
           <View style={styles.resultHeader}>
             <TouchableOpacity style={styles.backBtn} onPress={handleReset}>
@@ -122,21 +149,65 @@ export default function ScannerScreen({ initialAction, onBack }) {
         </ScrollView>
       ) : (
         <View style={styles.viewfinderContainer}>
-          {/* Top Bar */}
+          {/* Top Bar with Live Backend Connection Status */}
           <View style={styles.topBar}>
             <TouchableOpacity style={styles.backBtn} onPress={onBack}>
               <Ionicons name="arrow-back" size={20} color={COLORS.darkSlate} />
             </TouchableOpacity>
 
-            <View style={styles.statusPill}>
-              <Ionicons name="checkmark-circle" size={16} color={COLORS.darkSlate} />
-              <Text style={styles.statusPillText}>Offline Engine Ready</Text>
-            </View>
+            <TouchableOpacity
+              style={[
+                styles.statusPill,
+                serverStatus.connected ? styles.statusPillConnected : styles.statusPillDisconnected,
+              ]}
+              activeOpacity={0.7}
+              onPress={() => {
+                Alert.alert(
+                  serverStatus.connected ? '✅ AI Backend Connected' : '❌ AI Backend Offline',
+                  `Active Endpoint:\n${SERVER_URL}\n\nStatus: ${
+                    serverStatus.connected
+                      ? 'Connected to local model_server.py via ngrok tunnel.'
+                      : `${serverStatus.message}\n\nPlease check that run_app.bat is running on your PC.`
+                  }`,
+                  [
+                    { text: 'Retest Connection', onPress: verifyConnection },
+                    { text: 'OK' },
+                  ]
+                );
+              }}
+            >
+              {serverStatus.checking ? (
+                <ActivityIndicator size="small" color={COLORS.coral} style={{ marginRight: 6 }} />
+              ) : (
+                <Ionicons
+                  name={serverStatus.connected ? 'cloud-done' : 'cloud-offline'}
+                  size={15}
+                  color={serverStatus.connected ? '#10B981' : '#EF4444'}
+                  style={{ marginRight: 6 }}
+                />
+              )}
+              <Text
+                style={[
+                  styles.statusPillText,
+                  serverStatus.connected
+                    ? { color: '#065F46' }
+                    : serverStatus.checking
+                    ? { color: COLORS.darkSlate }
+                    : { color: '#991B1B' },
+                ]}
+                numberOfLines={1}
+              >
+                {serverStatus.checking
+                  ? 'Connecting...'
+                  : serverStatus.connected
+                  ? 'AI Server Online'
+                  : 'Backend Offline (Tap to test)'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Central Viewfinder Viewport with Brackets (Screen 3 Reference) */}
+          {/* Central Viewfinder Viewport with Brackets */}
           <View style={styles.viewfinderFrame}>
-            {/* Viewfinder Bracket Corners */}
             <View style={[styles.corner, styles.cornerTL]} />
             <View style={[styles.corner, styles.cornerTR]} />
             <View style={[styles.corner, styles.cornerBL]} />
@@ -145,7 +216,7 @@ export default function ScannerScreen({ initialAction, onBack }) {
             {loading ? (
               <View style={styles.loadingBox}>
                 <ActivityIndicator size="large" color={COLORS.coral} />
-                <Text style={styles.loadingTitle}>Analyzing Ripening...</Text>
+                <Text style={styles.loadingTitle}>Analyzing Banana...</Text>
                 <Text style={styles.loadingSub}>{loadingStep}</Text>
               </View>
             ) : selectedImage ? (
@@ -159,11 +230,15 @@ export default function ScannerScreen({ initialAction, onBack }) {
                 <Text style={styles.promptDesc}>
                   Ensure clear peel visibility and natural lighting
                 </Text>
+                {/* Live URL Subtitle */}
+                <Text style={styles.urlSubtitle} numberOfLines={1}>
+                  Target: {SERVER_URL}
+                </Text>
               </View>
             )}
           </View>
 
-          {/* Bottom Control Bar (Screen 3 Reference) */}
+          {/* Bottom Controls Bar */}
           <View style={styles.bottomBar}>
             {/* Gallery Upload */}
             <TouchableOpacity
@@ -176,7 +251,7 @@ export default function ScannerScreen({ initialAction, onBack }) {
               <Text style={styles.sideBtnText}>Gallery</Text>
             </TouchableOpacity>
 
-            {/* Circular Coral SCAN Button (Matching Reference UI) */}
+            {/* Circular Coral SCAN Button */}
             <TouchableOpacity
               style={styles.scanBtn}
               activeOpacity={0.85}
@@ -248,11 +323,26 @@ const styles = StyleSheet.create({
   statusPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.softGlacierBlue,
     paddingHorizontal: 14,
-    paddingVertical: 8,
+    paddingVertical: 9,
     borderRadius: 20,
-    gap: 6,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    maxWidth: '80%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  statusPillConnected: {
+    backgroundColor: '#ECFDF5',
+    borderColor: '#A7F3D0',
+  },
+  statusPillDisconnected: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
   },
   statusPillText: {
     fontSize: 12,
@@ -261,148 +351,155 @@ const styles = StyleSheet.create({
   },
   viewfinderFrame: {
     flex: 1,
-    marginVertical: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
+    marginVertical: 24,
+    backgroundColor: '#FFFFFF',
     borderRadius: 32,
-    borderWidth: 1.5,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
     overflow: 'hidden',
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 30,
-    resizeMode: 'cover',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 16,
+    elevation: 3,
   },
   corner: {
     position: 'absolute',
     width: 32,
     height: 32,
-    borderColor: COLORS.darkSlate,
+    borderColor: COLORS.coral,
   },
   cornerTL: {
     top: 20,
     left: 20,
-    borderTopWidth: 4,
-    borderLeftWidth: 4,
+    borderTopWidth: 3.5,
+    borderLeftWidth: 3.5,
     borderTopLeftRadius: 10,
   },
   cornerTR: {
     top: 20,
     right: 20,
-    borderTopWidth: 4,
-    borderRightWidth: 4,
+    borderTopWidth: 3.5,
+    borderRightWidth: 3.5,
     borderTopRightRadius: 10,
   },
   cornerBL: {
     bottom: 20,
     left: 20,
-    borderBottomWidth: 4,
-    borderLeftWidth: 4,
+    borderBottomWidth: 3.5,
+    borderLeftWidth: 3.5,
     borderBottomLeftRadius: 10,
   },
   cornerBR: {
     bottom: 20,
     right: 20,
-    borderBottomWidth: 4,
-    borderRightWidth: 4,
+    borderBottomWidth: 3.5,
+    borderRightWidth: 3.5,
     borderBottomRightRadius: 10,
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 32,
+    resizeMode: 'cover',
   },
   promptBox: {
     alignItems: 'center',
-    padding: 24,
+    paddingHorizontal: 28,
   },
   iconCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: COLORS.mintLight,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
   },
   promptTitle: {
     fontSize: 17,
-    color: COLORS.darkSlate,
+    color: COLORS.textPrimary,
     ...FONTS.bold,
-  },
-  promptDesc: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    ...FONTS.medium,
-    marginTop: 4,
+    marginBottom: 6,
     textAlign: 'center',
   },
+  promptDesc: {
+    fontSize: 12.5,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+    ...FONTS.medium,
+  },
+  urlSubtitle: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginTop: 12,
+    textAlign: 'center',
+    ...FONTS.medium,
+  },
   loadingBox: {
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    padding: 24,
-    borderRadius: 24,
     alignItems: 'center',
+    padding: 24,
   },
   loadingTitle: {
+    marginTop: 18,
     fontSize: 16,
     color: COLORS.textPrimary,
     ...FONTS.bold,
-    marginTop: 14,
   },
   loadingSub: {
+    marginTop: 6,
     fontSize: 12,
     color: COLORS.textSecondary,
     ...FONTS.medium,
-    marginTop: 4,
   },
   bottomBar: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    borderRadius: 40,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 4,
+    paddingHorizontal: 12,
   },
   sideBtn: {
     alignItems: 'center',
+    width: 68,
   },
   sideIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.background,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   sideBtnText: {
-    fontSize: 11,
-    color: COLORS.textSecondary,
+    fontSize: 12,
+    color: COLORS.darkSlate,
     ...FONTS.semiBold,
   },
   scanBtn: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 74,
+    height: 74,
+    borderRadius: 37,
     backgroundColor: COLORS.coral,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: COLORS.coral,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.45,
-    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     elevation: 6,
   },
   scanBtnText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    ...FONTS.extraBold,
+    fontSize: 11,
     marginTop: 2,
-    letterSpacing: 0.6,
+    ...FONTS.extraBold,
   },
 });
