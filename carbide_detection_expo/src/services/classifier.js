@@ -1,7 +1,6 @@
-export const CLASS_NAMES = ['With Carbide', 'Without Carbide', 'Not a Banana'];
+import { SERVER_URL } from './config';
 
-// Current PC Wi-Fi IP running model_server.py
-const SERVER_URL = 'http://192.168.1.5:5000/predict';
+export const CLASS_NAMES = ['With Carbide', 'Without Carbide', 'Not a Banana'];
 
 /**
  * Classifier service:
@@ -26,6 +25,7 @@ export async function classifyImage(imageUri) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/octet-stream',
+        'ngrok-skip-browser-warning': 'true',
       },
       body: blob,
       signal: controller.signal,
