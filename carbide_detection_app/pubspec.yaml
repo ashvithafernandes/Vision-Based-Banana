@@ -1,0 +1,27 @@
+name: carbide_detection_app
+description: "Offline Banana Ripening & Calcium Carbide Detection Application for Farmers"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  tflite_flutter: ^0.11.0
+  image_picker: ^1.1.2
+  image: ^4.3.0
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/models/mobilenetv3_carbide_3class_quant.tflite
+    - assets/models/labels.txt

@@ -1,0 +1,98 @@
+# ==============================================================================
+# Vision-Based-Banana .gitignore
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. Large Datasets & Archives (>100MB / Raw Images)
+# ------------------------------------------------------------------------------
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+/With Carbide/
+/Without Carbide/
+/Datasets_Compressed_512/
+*.jpg
+*.jpeg
+*.png
+# Allow asset images inside apps (e.g. icons, UI illustrations)
+!/carbide_detection_app/assets/**
+!/carbide_detection_expo/assets/**
+
+# ------------------------------------------------------------------------------
+# 2. Large Pretrained Model Weights (>50MB)
+# ------------------------------------------------------------------------------
+*.pt
+*.pth
+*.onnx
+*.weights
+*.ckpt
+*.h5
+
+# ------------------------------------------------------------------------------
+# 3. Python & Virtual Environments
+# ------------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ------------------------------------------------------------------------------
+# 4. Flutter & Dart (carbide_detection_app)
+# ------------------------------------------------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+**/build/
+**/carbide_detection_app/.dart_tool/
+**/carbide_detection_app/android/.gradle/
+**/carbide_detection_app/android/local.properties
+**/carbide_detection_app/android/app/build/
+**/carbide_detection_app/android/.idea/
+
+# ------------------------------------------------------------------------------
+# 5. Node / React Native / Expo (carbide_detection_expo)
+# ------------------------------------------------------------------------------
+**/node_modules/
+**/.expo/
+**/.expo-shared/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+
+# ------------------------------------------------------------------------------
+# 6. OS & IDE Specific
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
